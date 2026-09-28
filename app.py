@@ -32,9 +32,9 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config["SECRET_KEY"] = os.environ.get("SESSION_SECRET", "")
 if os.environ.get("RENDER") and not all(
-    os.environ.get(key) for key in ("DATABASE_URL", "ADMIN_PASSWORD", "SESSION_SECRET", "CODE_PEPPER")
+    os.environ.get(key) for key in ("DATABASE_URL", "ADMIN_PASSWORD", "SESSION_SECRET", "CODE_PEPPER", "WHATSAPP_NUMBER")
 ):
-    raise RuntimeError("Configura DATABASE_URL, ADMIN_PASSWORD, SESSION_SECRET y CODE_PEPPER en Render.")
+    raise RuntimeError("Configura DATABASE_URL, ADMIN_PASSWORD, SESSION_SECRET, CODE_PEPPER y WHATSAPP_NUMBER en Render.")
 database_url = os.environ.get("DATABASE_URL", "sqlite:///towiz-renovaciones.sqlite3")
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
@@ -188,7 +188,7 @@ def renew():
         abort(400, "Período inválido.")
     if parsed_cycle != cycle_number() or not hmac.compare_digest(signature, qr_signature(device, parsed_cycle)):
         abort(410, "Este QR venció. Abre la app para obtener el QR vigente.")
-    whatsapp_number = re.sub(r"\D", "", os.environ.get("WHATSAPP_NUMBER", "5491136021940"))
+    whatsapp_number = re.sub(r"\D", "", os.environ.get("WHATSAPP_NUMBER", ""))
     message = quote(f"Hola, solicito renovar mi acceso TOWIZ. Dispositivo: {device}. Período QR: {parsed_cycle}.")
     return render_template_string(
         PROMO,
