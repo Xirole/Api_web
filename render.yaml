@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: towiz-renovaciones
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CODE_PEPPER
+        sync: false
+      - key: WHATSAPP_NUMBER
+        sync: false
+      - key: PROMO_IMAGE_URL
+        value: ""
+
