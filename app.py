@@ -67,7 +67,7 @@ def index():
         PAGE,
         whatsapp_number=whatsapp,
         logo=os.environ.get("LOGO_IMAGE_URL", "/static/tvwiz-logo.png"),
-        promo=os.environ.get("PROMO_IMAGE_URL", ""),
+        promo=os.environ.get("PROMO_IMAGE_URL") or "/static/tvwiz-flyer.jpg",
     )
 
 
