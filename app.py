@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import io
 import os
 import re
-from flask import Flask, jsonify, render_template_string
+
+import qrcode
+from flask import Flask, jsonify, render_template_string, request, send_file
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
@@ -19,7 +22,7 @@ PAGE = """<!doctype html>
 <section id="step1" class="step"><div class="step-count">Paso 1 de 3</div><h2>Ingresa tu codigo</h2><p>Escribe el codigo de solicitud de 6 caracteres que muestra la app.</p><label class="small" for="manual">Codigo de solicitud</label><input id="manual" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="6 caracteres" aria-label="Codigo de solicitud"><button id="save-code">Guardar y continuar</button><p id="code-status" class="small" role="status"></p></section>
 <section id="step2" class="step" hidden><div class="step-count">Paso 2 de 3</div><h2>Comparte el flyer</h2><p>Publica la imagen promocional en tu estado de WhatsApp. El enlace para solicitar la activacion ira junto con la imagen.</p><button id="share">Compartir flyer</button><p class="small">Cuando regreses, toca el boton de abajo para continuar. Tu codigo ya esta guardado.</p><button id="shared" class="secondary">Ya lo comparti, continuar</button></section>
 <section id="step3" class="step" hidden><div class="step-count">Paso 3 de 3</div><h2>Notifica para activar</h2><p>Se abrira WhatsApp con tu codigo listo para enviar al gestor.</p><p id="result" class="code" aria-live="polite"></p><a id="notify" class="btn" href="#" aria-disabled="true">Notificar por WhatsApp</a><div class="actions"><button id="restart" class="secondary">Empezar otra solicitud</button></div></section>
-</section></main>
+<section class="card"><h2>Descargar la app</h2><p>Instala la ultima version de TVWIZ en tu telefono o TV directamente desde aqui.</p><a class="btn" href="{{ apk_url }}">Descargar app</a><p class="small">Si tu telefono lo pide, habilita la instalacion de aplicaciones de origenes desconocidos.</p></section></main>
 <script>
 const STORAGE_KEY='tvwiz-renewal-v1',MAX_AGE_MS=10*24*60*60*1000,manual=document.querySelector('#manual'),codeStatus=document.querySelector('#code-status'),resumeText=document.querySelector('#resume'),result=document.querySelector('#result'),notifyLink=document.querySelector('#notify'),shareButton=document.querySelector('#share');
 const whatsappNumber={{ whatsapp_number|tojson }};let requestCode='',currentStep=1,createdAt=0;
@@ -34,16 +37,36 @@ shareButton.addEventListener('click',async()=>{if(!requestCode)return;const imag
 document.querySelector('#shared').addEventListener('click',()=>showStep(3));
 document.querySelector('#restart').addEventListener('click',()=>{requestCode='';currentStep=1;createdAt=0;manual.value='';try{localStorage.removeItem(STORAGE_KEY)}catch(e){}resumeText.textContent='';codeStatus.textContent='';showStep(1)});
 loadState();
+(function(){const fromUrl=new URLSearchParams(location.search).get('code');if(validCode(fromUrl)){requestCode=String(fromUrl).trim().toUpperCase();manual.value=requestCode;resumeText.textContent='Codigo leido del QR. Continua desde el paso 2.';showStep(2)}})();
 </script></body></html>"""
 
 @app.get("/healthz")
 def healthz():
     return jsonify(status="ok")
 
+@app.get("/qr/<codigo>.png")
+def qr_png(codigo: str):
+    code = re.sub(r"[^A-Za-z0-9]", "", codigo or "").upper()
+    if len(code) != 6:
+        return jsonify(error="Codigo de solicitud invalido"), 400
+    link = request.url_root.rstrip("/") + "/?code=" + code
+    image = qrcode.make(link, box_size=10, border=3)
+    output = io.BytesIO()
+    image.save(output, format="PNG")
+    output.seek(0)
+    return send_file(output, mimetype="image/png", max_age=300)
+
+
 @app.get("/")
 def index():
     whatsapp = re.sub(r"\D", "", os.environ.get("WHATSAPP_NUMBER", ""))
-    return render_template_string(PAGE, whatsapp_number=whatsapp, logo=os.environ.get("LOGO_IMAGE_URL", "/static/tvwiz-logo.png"), promo=os.environ.get("PROMO_IMAGE_URL") or "/static/tvwiz-flyer.jpg")
+    return render_template_string(
+        PAGE,
+        whatsapp_number=whatsapp,
+        logo=os.environ.get("LOGO_IMAGE_URL", "/static/tvwiz-logo.png"),
+        promo=os.environ.get("PROMO_IMAGE_URL") or "/static/tvwiz-flyer.jpg",
+        apk_url=os.environ.get("APK_URL", "https://raw.githubusercontent.com/Xirole/Api_web/main/TVWIZ.apk"),
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")), debug=False)
